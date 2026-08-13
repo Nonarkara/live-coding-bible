@@ -33,6 +33,12 @@ Everything else follows from this.
 | 06 | [Gamification Layer](#06-gamification-layer) | Deep work as game mechanics | `tactics/06-gamification.md` |
 | 07 | [Unified Visitor Analytics](#07-unified-visitor-analytics) | One token, every subdomain | `tactics/07-visitor-analytics.md` |
 | 08 | [Plan / Room Architecture](#08-plan--room-architecture) | Phone-first dashboard + 3D opt-in | `tactics/08-plan-room.md` |
+| 09 | [Poison-Proof CDN Deploy](#09-poison-proof-cdn-deploy) | Verify bytes, not just the version string | `tactics/09-poison-proof-deploy.md` |
+| 10 | [Three-Job Service Pattern](#10-three-job-service-pattern) | server + tunnel + watchdog, never one job | `tactics/10-three-job-service.md` |
+| 11 | [Anti-Regression Ledger](#11-anti-regression-ledger) | Numbered "do not touch" list, each with its reason | `tactics/11-anti-regression.md` |
+| 12 | [Lesson Docs / CPDT Trace](#12-lesson-docs--cpdt-trace) | One doc per hard session, one line for the next agent | `tactics/12-lesson-docs.md` |
+| 13 | [Graceful Degradation Split](#13-graceful-degradation-split) | CDN frontend + laptop backend, mock fallback everywhere | `tactics/13-graceful-degradation.md` |
+| 14 | [Shared Data Catalog](#14-shared-data-catalog) | Catalogue a source once, port the adapter forever | `tactics/14-data-catalog.md` |
 
 ---
 
@@ -194,6 +200,113 @@ el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 600, fill: 'forwards' }
 **Reference:** `nonarkara-org/app.js` — the entire thing. Single HTML file + single JS module.
 
 **The insight:** The 3D room is not the product. The plan view is the product. The room is the experience layer for when someone wants to feel the depth of what they're looking at. Separating them means you never compromise either.
+
+---
+
+## 09 Poison-Proof CDN Deploy
+
+**The tactic:** A deploy tool reporting success only means the origin has new bytes. Edge nodes converge independently — HTML and each asset are separate cache entries — so a node can serve new HTML against stale JS, and the *first* request for a new `?v=` key caches those stale bytes permanently under it. Verifying the wrong way (curling the real URL early) is what causes this. Verify content through throwaway `&probe=N` keys instead, so a stale response can only poison a key nobody will ever request again.
+
+**Reference implementation:** `FloodDash/scripts/deploy-frontend.sh` — canonical alias verified before the custom domain is touched at all; then one JS + one CSS file md5-checked against the local tree through 24 throwaway probes, requiring 3 consecutive matches before declaring convergence.
+
+**The incident that forced this:** a patched XSS fix sat un-served in production for hours because the HTML version string checked out while the edge still held old JS. Cost a same-session version bump cascade (`3.8.15 → 3.8.20 → 3.8.21 → 3.8.22 → 3.8.23 → 3.8.25`) to force the edge to let go.
+
+```bash
+probe_asset() {  # never request the real ?v= key until content is proven
+  local want=$(md5_of "public/$2") got streak=0
+  for i in $(seq 1 24); do
+    got=$(curl -fsS "$1/$2?${EXPECTED}&probe=$i" | md5_of /dev/stdin)
+    [[ "$got" == "$want" ]] && streak=$((streak+1)) || streak=0
+    [[ $streak -ge 3 ]] && return 0
+  done
+  return 1  # never converged — do NOT request the real key
+}
+```
+
+**Why it matters:** localhost is never a deliverable, and neither is "the deploy tool said success." A deploy is a human receiving new bytes — verify that claim, not the upload.
+
+---
+
+## 10 Three-Job Service Pattern
+
+**The tactic:** Every always-on service gets **three** launchd jobs, never one: `com.<app>.server` (the process, `KeepAlive: true`), `com.<app>.tunnel` (cloudflared, with its **own** `--config` file — never the shared fallback), and `com.<app>.watchdog` (polls `/api/health`, restarts, escalates to a human rather than restarting forever). Plus a nightly `.backup` job.
+
+**Reference implementation:** `FloodDash/CLAUDE.md`, `AirDash/CLAUDE.md` — `com.flooddash.server` + `.tunnel`; restart via `launchctl kickstart -k gui/$(id -u)/com.flooddash.server`.
+
+**The incident that forced the tunnel rule:** `cloudflared tunnel run <name>` with no `--config` flag silently falls back to `~/.cloudflared/config.yml`. Two tunnels both fell back to it and overwrote each other's ingress routing — two unrelated products went down together, no error anywhere. Fix: make the shared fallback deliberately inert.
+
+```yaml
+# ~/.cloudflared/config.yml — every tunnel has its own file, loaded via
+# an explicit --config flag. Don't add ingress here.
+ingress:
+  - service: http_status:404
+```
+
+**Why it matters:** a watchdog that checks the wrong thing is worse than none — it manufactures confidence. One flood collection loop ran dead for 36 days while its archive grew quadratically underneath it, because nothing was checking last-successful-ingest, only "is the process running."
+
+---
+
+## 11 Anti-Regression Ledger
+
+**The tactic:** Every project `CLAUDE.md` opens with a numbered, dated **"do not touch"** section — each item paired with *why*. Agents don't vandalise, they tidy; anything that looks like an oddity gets "cleaned up" unless the reason it's deliberate is written down next to it.
+
+**Reference implementation:** `daytraders/CLAUDE.md` §Anti-Regression:
+```
+1. Zero border-radius — enforced in globals.css. Do not remove the
+   `border-radius: 0 !important` reset. It is load-bearing.
+2. Three font sizes only — Display/Body/Micro. Do not introduce a fourth.
+5. Mock data in src/lib/api/mock.ts — the app must render fully with no
+   API keys. Never remove mock fallbacks.
+```
+
+Reverted experiments get the same treatment, dated, so a half-remembered good idea doesn't quietly come back:
+```
+### Hero-Surface Font Exception — TRIALED THEN REVERTED (2026-07-22 → 2026-07-24)
+```
+
+**Why it matters:** this is the single highest-leverage paragraph in any project file. It converts "don't regress the design" from a vibe into something an agent can check before it edits.
+
+---
+
+## 12 Lesson Docs / CPDT Trace
+
+**The tactic:** After any session that was hard, write `docs/lessons/YYYY-MM-DD-the-<something>-pass.md`: what was actually asked (verbatim quote), what landed, patterns borrowed from prior art (table: source → pattern → where it landed, including what was explicitly **refused** and why), honest limits stated in the doc itself, what didn't make the cut, the real CPDT trace, and — the whole point — **one line for the next agent**.
+
+**Reference implementation:** `daytraders/docs/lessons/2026-08-11-the-globe-pass.md`. Closing line:
+> "Look across the globe" is a curation discipline, not a feature flag. Eight instruments, read the same way, ranked the same way. Anything more is a screen; a screen is what the user is leaving.
+
+**The CPDT trace, verbatim from a real ship:**
+```
+git pull origin main
+git add -A
+git commit -m "feat(global): look across the globe — global scanner + what-to-watch"
+git push origin main
+npm run build                    # success
+npx wrangler pages deploy        # 682f5208.siam-markets.pages.dev
+curl day.nonarkara.org           # 200 OK with GLOBAL SCANNER present in body
+```
+
+**Why it matters:** a five-week-dormant project becomes productive in ten minutes when the "why is it like this, and what did we already try" question already has a written answer.
+
+---
+
+## 13 Graceful Degradation Split
+
+**The tactic:** Static frontend on a CDN (Cloudflare Pages), talking to a Pages Function that proxies **all** of `/api/*` with no hard-coded route list, to a named Cloudflare Tunnel, to `localhost:PORT` on the laptop. If the laptop sleeps, the site still loads — only live data goes stale, and the UI says how stale. Every project also ships `src/lib/api/mock.ts` so it renders fully with zero API keys.
+
+**Reference implementation:** `FloodDash/CLAUDE.md`, `AirDash/CLAUDE.md` — `functions/api/[[path]].js` catches all of `/api/*`; adding a backend endpoint needs no frontend deploy at all.
+
+**Why it matters:** an upstream feed dying degrades the app instead of breaking it, and a laptop closing degrades the app instead of taking down a public dashboard. Degradation has to be *visible* to stay honest — a green dot plus "data 12 minutes old," never a silently stale number.
+
+---
+
+## 14 Shared Data Catalog
+
+**The tactic:** One `_shared/data-catalog/CATALOG.md` across every project: source, cadence → **real latency** (two different numbers — "updates every 10 min" and "data is 10–60 min old" are both true and only the second matters to the UI), auth, tier, and a ✅/📋 status. ✅ rows get a full detail file; 📋 rows point straight at the working implementation in whatever project built it first. Before wiring a new adapter, check the catalog and port the known-good implementation instead of rebuilding it.
+
+**Reference implementation:** `_shared/data-catalog/CATALOG.md` — e.g. `HII ThaiWater — water level | 10 min → 10–60 min | none | live→cache | ✅`.
+
+**Why it matters:** the catalog grows from real builds, not a documentation sprint that never happens — you port a 📋 row to a detail file the next time you actually touch that source. A flood dashboard and an air-quality dashboard now share one ingest backbone because the sources were written down somewhere neither project owned.
 
 ---
 
