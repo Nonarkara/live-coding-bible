@@ -334,3 +334,5 @@ curl day.nonarkara.org           # 200 OK with GLOBAL SCANNER present in body
 ---
 
 *This file grows. When you build something new that uses a pattern worth keeping, add it here. Append, don't rewrite.*
+
+This repository is licensed under the MIT License. See [LICENSE](LICENSE).
