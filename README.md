@@ -1,215 +1,193 @@
-# Dr Non's Playbook — How I Build Things
+<p align="center">
+  <img src="docs/hero-banner.png" alt="A mentor and a student at a lamp-lit desk of notebooks, programming books, and a glowing IDE — late-night live coding as craft." width="100%">
+</p>
 
-**Read this first. Every session. It saves tokens.**
+# Live Coding Bible
 
-This is the living record of Dr Non's recurring techniques and tactics. Not theory — each entry is a pattern already deployed in production, with exact file references. When you're about to build something, check here first. The answer is probably already built.
+**A playbook for data-heavy civic dashboards — production tactics you can reuse, not theory.**
+
+[![License: MIT](https://img.shields.io/badge/license-MIT-1A1A1A)](LICENSE)
+
+By [Dr Non Arkaraprasertkul](https://github.com/Nonarkara) — architect, urban anthropologist, Senior Expert in Smart City Promotion at Thailand's Digital Economy Promotion Agency (depa), and founder of [Axiom](https://axiom.nonarkara.org).
+
+This is independent studio writing from a Bangkok civic studio. It is **not** an official depa, ASEAN, or municipal product.
 
 ---
 
-## Who This Is For
+## What this is
 
-Claude Code sessions starting on any project in this workspace. If you're in a new session and haven't read this, stop and read it. You'll spend the first 20 minutes re-discovering things that are already solved.
+A living record of tactics already running in production civic systems — flood watch, air quality, municipal control towers, satellite maps, open city indexes. Each entry exists because a real build needed it, and several exist because production broke first.
 
-## The Core Philosophy (30 seconds)
+This repository is the **playbook**, not the source tree of those systems. There is no app to clone and deploy here. What you get is the pattern: the job it does, why it exists, a sketch you can port, and the anti-pattern that looks similar and fails.
 
-Dr Non's signature move: **show different data sources on the same axis to reveal correlations that nobody thought to look for**. He doesn't optimize milliseconds. He optimizes for:
-1. **Surprise** — the moment a user sees two things together that they never expected to correlate
-2. **Reward** — the feeling of capability that comes from acting on good information
-3. **Trust** — the system earns the user's attention by being honest about what it doesn't know
+It is written for two readers at once:
+
+- **A human** about to build a civic dashboard who would rather steal a proven move than rediscover it.
+- **An agent** starting a session who should read this before inventing a new architecture.
+
+If a tactic is in this file, treat it as prior art. Check here first.
+
+**This repo is not:**
+
+- Source code for FloodDash, AirDash, or any municipal tower. Those live in their own repositories; some implementations stay private.
+- An official warning system, city ranking, or government publication.
+- A dump of workspace paths, analytics tokens, database URLs, or spreadsheet IDs. Those do not belong in a public playbook.
+
+Related public work: [FloodDash Blueprint](https://github.com/Nonarkara/FloodDash-Blueprint), [AirDash](https://github.com/Nonarkara/airdash), [NST control tower](https://github.com/Nonarkara/nst-control-tower), [DrNon Global Satellite Toolkit](https://github.com/Nonarkara/DrNon-Global-Satellite-Toolkit), [vibecoding skills](https://github.com/Nonarkara/dr-non-vibecoding-skills).
+
+---
+
+## Philosophy
+
+The signature move: **show different data sources on the same axis** so a person can see a correlation nobody pre-announced. Do not optimize milliseconds. Optimize for:
+
+1. **Surprise** — two things on one surface that nobody thought to look at together.
+2. **Reward** — the feeling of capability that comes from acting on good information.
+3. **Trust** — the system earns attention by being honest about what it does not know.
 
 Everything else follows from this.
 
----
+Code is communication with future you. Write the reason next to the oddity; an agent will otherwise "clean it up." Prefer a map that *is* the page over a dashboard that hides the city in a widget. Prefer a 5-minute cache that feels live over a websocket you cannot afford. Prefer a visible stale number over a green dot that lies.
 
-## Tactics Index
-
-| # | Tactic | In One Line | Reference |
-|---|--------|-------------|-----------|
-| 01 | [Multi-Source Correlation](#01-multi-source-correlation) | Different data sources on one axis | `tactics/01-correlation.md` |
-| 02 | [Illusion of Real-Time](#02-illusion-of-real-time) | 5-min cron that feels live | `tactics/02-realtime.md` |
-| 03 | [Fleet Health Monitor](#03-fleet-health-monitor) | Ping all subdomains → one dashboard | `tactics/03-fleet-health.md` |
-| 04 | [Satellite-First Design](#04-satellite-first-design) | Map is the page, not a widget | `tactics/04-satellite-first.md` |
-| 05 | [Second Brain Pipeline](#05-second-brain-pipeline) | Thought → Supabase vector + Sheets | `tactics/05-second-brain.md` |
-| 06 | [Gamification Layer](#06-gamification-layer) | Deep work as game mechanics | `tactics/06-gamification.md` |
-| 07 | [Unified Visitor Analytics](#07-unified-visitor-analytics) | One token, every subdomain | `tactics/07-visitor-analytics.md` |
-| 08 | [Plan / Room Architecture](#08-plan--room-architecture) | Phone-first dashboard + 3D opt-in | `tactics/08-plan-room.md` |
-| 09 | [Poison-Proof CDN Deploy](#09-poison-proof-cdn-deploy) | Verify bytes, not just the version string | `tactics/09-poison-proof-deploy.md` |
-| 10 | [Three-Job Service Pattern](#10-three-job-service-pattern) | server + tunnel + watchdog, never one job | `tactics/10-three-job-service.md` |
-| 11 | [Anti-Regression Ledger](#11-anti-regression-ledger) | Numbered "do not touch" list, each with its reason | `tactics/11-anti-regression.md` |
-| 12 | [Lesson Docs / CPDT Trace](#12-lesson-docs--cpdt-trace) | One doc per hard session, one line for the next agent | `tactics/12-lesson-docs.md` |
-| 13 | [Graceful Degradation Split](#13-graceful-degradation-split) | CDN frontend + laptop backend, mock fallback everywhere | `tactics/13-graceful-degradation.md` |
-| 14 | [Shared Data Catalog](#14-shared-data-catalog) | Catalogue a source once, port the adapter forever | `tactics/14-data-catalog.md` |
+The hero at the top is the craft, not a title card: a mentor and a student, SOLID on the desk, a learning cycle that says understand → try → reflect → improve. That is the studio. The parchment is left blank on purpose. The illustration is the HUD.
 
 ---
 
-## 01 Multi-Source Correlation
+## Ethical use
 
-**The tactic:** Normalize data from unrelated sources and plot them together. The correlation — or lack of it — IS the insight. You don't predict what people will find interesting. You make the comparison possible and let them discover it.
+These patterns are for **public-good civic software**: honest situational awareness, open data, systems a city can run without a vendor lock-in. They are not a kit for surveillance, dark patterns, or pretending a private feed is an official alert.
 
-**Examples in production:**
-- `nonarkara-org/app.js` — USD/THB + BTC + SET + Gold + Brent + PTT on one brief grid
-- `nonarkara-org/app.js` — Bangkok weather + AQI on the same time window as market data
-- `conflict-tracker/v3-global/` — satellite aerosol layer + conflict events + news headlines on one map
-- `phuket/dashboard/` — weather + AQI + flight arrivals + tourist volume on one ops view
+**Do**
 
-**The pattern:**
+- Label freshness. Every live-looking number needs a source, an age, and a fallback tier. Stale, modelled, and missing are different states; the UI must say which.
+- Keep analytics cookie-free and aggregate when you can. Prefer provider pixels that do not fingerprint. Store any beacon token as an environment variable, never in git.
+- Correlate **public signals** (weather with water; news with sensors). Do not build "correlation" as a way to track individuals.
+- Attribute upstream data. The number belongs to HII, GISTDA, Open-Meteo, Traffy, NASA — whoever produced it.
+- Degrade in public. If the laptop sleeps or an API dies, the page still loads and says the data is old.
+
+**Do not**
+
+- Ship mock data as live, or hide an empty feed behind a success state.
+- Commit API keys, analytics tokens, database hosts, spreadsheet IDs, tunnel credentials, or personal capture endpoints.
+- Imply depa, ASEAN, a municipality, or a UN body publishes this playbook or the systems it describes, unless that system's own README says so.
+- Use fleet-health pings, visitor beacons, or second-brain capture pipelines to collect more personal data than the product needs.
+- Treat this file as authorization to copy a private implementation. Rebuild from the idea.
+
+If a contribution would only work by pasting a secret, it does not belong here. Describe the pattern; leave the credential in the operator's environment.
+
+---
+
+## How to use the patterns
+
+Read the index. Pick the row that matches the job. Port the sketch; do not hunt a private workspace for the original file. When you adapt a snippet, put tokens in env vars.
+
+Agents: this README is the playbook. Do not scan a 65-repo tree looking for `tactics/*.md`. Those files are not in this repository.
+
+| # | Tactic | In one line |
+|---|--------|-------------|
+| 01 | [Multi-source correlation](#01-multi-source-correlation) | Different public sources on one axis |
+| 02 | [Illusion of real-time](#02-illusion-of-real-time) | A 5-minute cron that feels live |
+| 03 | [Fleet health monitor](#03-fleet-health-monitor) | One worker pings every hostname |
+| 04 | [Satellite-first design](#04-satellite-first-design) | The map is the page, not a widget |
+| 05 | [Second-brain pipeline](#05-second-brain-pipeline) | Thought → local + searchable + human sheet |
+| 06 | [Gamification layer](#06-gamification-layer) | Deep work as honest game mechanics |
+| 07 | [Unified visitor analytics](#07-unified-visitor-analytics) | One cookie-free beacon, every host |
+| 08 | [Plan / room architecture](#08-plan--room-architecture) | Phone-first plan; 3D as opt-in |
+| 09 | [Poison-proof CDN deploy](#09-poison-proof-cdn-deploy) | Verify bytes, not the version string |
+| 10 | [Three-job service pattern](#10-three-job-service-pattern) | Server + tunnel + watchdog, never one job |
+| 11 | [Anti-regression ledger](#11-anti-regression-ledger) | Numbered "do not touch," each with a why |
+| 12 | [Lesson docs / CPDT trace](#12-lesson-docs--cpdt-trace) | One doc per hard session; one line for the next agent |
+| 13 | [Graceful degradation split](#13-graceful-degradation-split) | CDN frontend, laptop backend, mock fallback |
+| 14 | [Shared data catalog](#14-shared-data-catalog) | Catalogue a source once, port the adapter forever |
+
+### 01 Multi-source correlation
+
+**The tactic:** Normalize unrelated public sources and plot them together. The correlation — or the lack of it — *is* the insight. Do not predict what people will find interesting. Make the comparison possible.
+
+**Seen in production:** a daily brief with FX, crypto, equities, gold, and oil on one grid; weather + AQI on the same window as markets; aerosol + conflict events + headlines on one map; weather + flights + tourist volume on one ops view.
+
 ```js
-// 1. Fetch all sources in parallel (never sequential)
 const [fx, crypto, weather, aqi] = await Promise.all([
   fetch('/api/fx'), fetch('/api/crypto'),
   fetch('/api/weather'), fetch('/api/aqi')
 ]);
-
-// 2. Normalize to the same units if comparing (%, or same scale)
-// 3. Render on the same grid — user draws their own conclusions
-// 4. Never pre-conclude the correlation for them
+// Normalize to comparable units. Render on one grid.
+// Never pre-conclude the correlation for the reader.
 ```
 
-**Anti-pattern:** Building a "feature" that says "USD is correlated with BTC." That's lazy. Build the surface. Let the user see it. Trust their intelligence.
+**Anti-pattern:** a "feature" that announces "USD is correlated with BTC." Build the surface. Trust the reader.
 
----
+### 02 Illusion of real-time
 
-## 02 Illusion of Real-Time
+**The tactic:** A five-minute cron that hits an API, stores the result in KV, and serves it to browsers looks identical to a live stream for almost every civic use. The cases that need a true websocket can pay for one.
 
-**The tactic:** A 5-minute cron job that hits an API, stores the result in KV, and serves it to browsers looks identical to a live stream — for 99% of use cases. The 1% that needs true real-time pays for it.
+**Cost math:** a managed websocket is tens to hundreds of dollars a month plus engineering. Cron + KV on a worker free tier is a few lines. User-visible difference is zero unless the job is arbitrage.
 
-**Full documentation:** `_toolkit/claude-skills/claude-skills/ninja-innovation/SKILL.md`
+**Anti-pattern:** streaming infrastructure as a default because "live" is in the brief.
 
-**Examples in production:**
-- `nonarkara-org/worker/src/index.js` — `/daily-brief` endpoint, all market quotes cached in KV for 5 min
-- `nonarkara-org/worker/src/index.js` — `/status` fleet health, KV-cached, cron every 5 min
-- `conflict-tracker/v3-global/` — ACLED + GDELT + NASA FIRMS fetched once per cron, served instantly
+### 03 Fleet health monitor
 
-**The cost math:**
-- Real-time WebSocket stream: ~$50–200/month (Pusher/Ably), engineering overhead
-- 5-min cron + KV: $0 (Cloudflare free tier), 3 lines of Worker code
-- User-visible difference: zero, unless their job is arbitrage trading
+**The tactic:** One worker probes every public hostname on a timer, stores a snapshot, and serves `/status`. The browser paints from `localStorage` first, then refreshes. Adding a site is a hostname in a list, not a deploy to that site.
 
----
-
-## 03 Fleet Health Monitor
-
-**The tactic:** A single Cloudflare Worker pings every subdomain every 5 minutes, stores results in KV, serves a `/status` JSON endpoint. The browser polls every 3 minutes. Every project's status dot updates without touching those projects.
-
-**Reference implementation:** `nonarkara-org/worker/src/index.js`
-
-**The 3 pieces:**
 ```js
-// 1. Worker cron: probe all domains in parallel
 const results = await Promise.all(DOMAINS.map(probe));
 await env.STATUS.put('snapshot:v1', JSON.stringify({ ts, sites }));
 
-// 2. Client: cache in localStorage, poll every 3 min
-const cached = localStorage.getItem('nonarkara.status.snapshot');
-if (cached) paintStatus(JSON.parse(cached));   // instant on load
-
-// 3. UI: amber dot = OK, red = fail, dim = unknown
+const cached = localStorage.getItem('studio.status.snapshot');
+if (cached) paintStatus(JSON.parse(cached));
 ```
 
-**Why it matters:** 28+ subdomains. One worker. Zero per-project code changes needed to add a new site — just add its hostname to the DOMAINS array.
+Amber = OK, red = fail, dim = unknown. The probe is for *your* public surfaces, not for scanning other people's networks.
 
----
+### 04 Satellite-first design
 
-## 04 Satellite-First Design
+**The tactic:** The map is the page. Everything else is an overlay. No boxed layout, no sidebar wider than the eye can track, no panel that cuts the city in half.
 
-**The tactic:** The map/satellite layer is the page. Not a component inside a page — the page. Everything else is an overlay on top of the map. This means: no boxed layout, no sidebar wider than the eye can track, no panels that cut the map in half.
+> If a UI element can only be seen by scrolling *past the map*, it does not exist for most users.
 
-**Full documentation:** `_toolkit/claude-skills/claude-skills/non-app-pattern/SKILL.md` (§ Reference implementation)
+Every data surface must be reachable without leaving the map viewport — a collapsed overlay or a slide-in from an edge.
 
-**Examples:**
-- `phuket/dashboard/phuket-dashboard/` — Leaflet + deck.gl map fills viewport; three panels pin to corners
-- `conflict-tracker/v3-global/` — MapLibre fills screen; TVs are overlays
-- `asean/kuching-ioc/` — Leaflet base; data layers toggle as transparent overlays
-- `consulting/chula/apps/web/` — Map center; everything else positions around it
+**Anti-pattern:** a dashboard with a map widget in a card grid.
 
-**The rule that breaks most dashboards:**
-> If a UI element can only be seen by scrolling *past the map*, it does not exist for 90% of users.
+### 05 Second-brain pipeline
 
-Every data surface must be reachable without leaving the map viewport, either as a collapsed overlay or a slide-in panel from an edge.
+**The tactic:** A captured note goes three places that never replace each other: local storage (instant, offline), a searchable store (vector or full-text), and a human-readable sheet or log. Each layer has a job. The pipeline is the product, not the vendor names.
 
----
-
-## 05 Second Brain Pipeline
-
-**The tactic:** Every thought, note, or observation captured in the plan view goes three places simultaneously: localStorage (instant, offline), Supabase `captures` table (searchable via pgvector), Google Sheets (human-readable, shareable). The three layers serve different purposes and never replace each other.
-
-**Reference implementation:**
-- Capture endpoint: `nonarkara-org/worker/src/index.js` → `POST /capture`
-- Supabase schema: `nonarkara-org/worker/migrations/second-brain-schema.sql`
-- Google Apps Script: `nonarkara-org/worker/apps-script/second-brain-sheet.js`
-- Client call: `nonarkara-org/app.js` → NOTE button handler
-
-**The pipeline in one diagram:**
 ```
-User types note
-  → localStorage (instant, always works offline)
-  → POST /capture to Worker
-      → Supabase captures table (pgvector for semantic search)
-      → Google Sheets row (for human review, formula analysis)
-      → OpenAI embedding (1536-dim, stored back to Supabase)
+User types a note
+  → localStorage (always works offline)
+  → POST /capture
+      → searchable store + embedding
+      → a row a human can read
 ```
 
-**Supabase project:** `qoagbsslzgaflwjmguej.supabase.co` (Second Brain v2)
-**Sheets:** `1DM66spLCh_PKJ0hncFBWVft_H-3UiePONynjTltSvQg`
+Hosts, project refs, and sheet IDs stay in the operator's environment. They are not part of the pattern.
 
----
+### 06 Gamification layer
 
-## 06 Gamification Layer
+**The tactic:** Earn attention by making progress visible, reward tangible, and the cost of distraction concrete. Not leaderboards. The quiet fact of a timer, a streak, or a broken-focus count.
 
-**The tactic:** The interface earns the user's attention by making progress visible, making reward tangible, and making the cost of distraction concrete. Not leaderboards or badges — the quiet satisfaction of a Pomodoro timer that shows your completion rate, a step count, or a focus streak.
+1. **A thing to protect** — uninterrupted time, a streak, a daily count.
+2. **A reward that isn't fake** — a painting, a line of philosophy, something worth looking at.
+3. **An honest cost** — "you broke focus N times" as signal, not shame.
 
-**The three elements:**
-1. **A thing to protect** — uninterrupted focus time, a streak, a daily count
-2. **A reward that isn't fake** — museum art during a Pomodoro session, rotating philosophical quotes, a sense of aesthetic pleasure
-3. **An honest cost** — the Pomodoro shows "you broke focus X times this week" not as shame but as signal
+### 07 Unified visitor analytics
 
-**Examples in production:**
-- `nonarkara-org/app.js` — Pomodoro with 21 Nonist quotes, FRAME mode with 47 museum paintings
-- `nonarkara-org/art-manifest.json` — 47 CC0 paintings from Met + AIC with Non-voiced notes
-- `TKC/talent-support-dashboard/` — DQ3 board game as HR management system
+**The tactic:** One cookie-free analytics beacon covers every hostname you actually operate. Behavioral counts (visitors, pages, countries, referrers) from the host platform; contextual events only if you still need them, written to a store you control.
 
-**The Pomo quote pattern:**
-```js
-// Rotate a quote every 40s using Web Animations API (not CSS transitions —
-// those break when parent transitions from display:none)
-el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 600, fill: 'forwards' });
-```
+Keep the token in environment config. Do not paste it into a README, a tactic file, or a public snippet. GDPR-clean means you do not need a consent wall for aggregate, non-identifying traffic — it does not mean "collect everything."
 
----
+**Anti-pattern:** thirty inline copies of the same tracker, each with a different hardcoded id.
 
-## 07 Unified Visitor Analytics
+### 08 Plan / room architecture
 
-**The tactic:** One analytics token (`0da324da0e204440a172088c0fafc92c`) covers all subdomains via Cloudflare Web Analytics. One Google Sheets tracker module covers custom events. Both are cookie-free, GDPR-clean, and require zero consent banners.
+**The tactic:** Phone users land on a 2D plan — a data surface that works with one thumb. Desktop users who want immersion can enter a 3D room. The toggle persists. Music, notes, timers work from the plan.
 
-**The canonical module:** `_shared/lib/visitor-tracking.js`
+The 3D room is not the product. The plan is the product. The room is the experience layer. Separating them means you never compromise either.
 
-**The two layers:**
-1. **Cloudflare Web Analytics** (behavioral) — unique visitors, top pages, countries, referrers. Zero JS needed on CF Pages sites; one `<script defer>` on external hosts.
-2. **Google Sheets pipeline** (contextual) — country, city, IP, device, timezone, referrer — every detail you can't get from Cloudflare alone.
+### 09 Poison-proof CDN deploy
 
-**Current status:** Beacon added to all 16 active subdomains. See `_shared/lib/visitor-tracking.js` for the canonical module that replaces the 30+ inline implementations.
-
----
-
-## 08 Plan / Room Architecture
-
-**The tactic:** Phone users (the majority) land on a 2D plan view — a clean data dashboard that works with one thumb. Desktop users and those who want immersion can enter the 3D room view. The toggle persists in localStorage. Music, notes, Pomodoro — everything works from the plan view.
-
-**Full documentation:** `_toolkit/claude-skills/claude-skills/non-app-pattern/SKILL.md`
-
-**Reference:** `nonarkara-org/app.js` — the entire thing. Single HTML file + single JS module.
-
-**The insight:** The 3D room is not the product. The plan view is the product. The room is the experience layer for when someone wants to feel the depth of what they're looking at. Separating them means you never compromise either.
-
----
-
-## 09 Poison-Proof CDN Deploy
-
-**The tactic:** A deploy tool reporting success only means the origin has new bytes. Edge nodes converge independently — HTML and each asset are separate cache entries — so a node can serve new HTML against stale JS, and the *first* request for a new `?v=` key caches those stale bytes permanently under it. Verifying the wrong way (curling the real URL early) is what causes this. Verify content through throwaway `&probe=N` keys instead, so a stale response can only poison a key nobody will ever request again.
-
-**Reference implementation:** `FloodDash/scripts/deploy-frontend.sh` — canonical alias verified before the custom domain is touched at all; then one JS + one CSS file md5-checked against the local tree through 24 throwaway probes, requiring 3 consecutive matches before declaring convergence.
-
-**The incident that forced this:** a patched XSS fix sat un-served in production for hours because the HTML version string checked out while the edge still held old JS. Cost a same-session version bump cascade (`3.8.15 → 3.8.20 → 3.8.21 → 3.8.22 → 3.8.23 → 3.8.25`) to force the edge to let go.
+**The tactic:** "Deploy succeeded" means the origin has new bytes. Edge nodes converge independently. New HTML against stale JS can cache the wrong payload under a new `?v=` key forever. Do not verify by curling the real URL early. Probe through throwaway keys so a stale response can only poison a key nobody will request again.
 
 ```bash
 probe_asset() {  # never request the real ?v= key until content is proven
@@ -223,116 +201,87 @@ probe_asset() {  # never request the real ?v= key until content is proven
 }
 ```
 
-**Why it matters:** localhost is never a deliverable, and neither is "the deploy tool said success." A deploy is a human receiving new bytes — verify that claim, not the upload.
+Localhost is never a deliverable. Neither is the deploy tool's success line. A deploy is a human receiving new bytes.
 
----
+### 10 Three-job service pattern
 
-## 10 Three-Job Service Pattern
+**The tactic:** An always-on service gets three supervised jobs, never one: the process (`KeepAlive`), the tunnel (its **own** config file — never the shared fallback), and a watchdog that polls health, restarts, and escalates to a human instead of looping forever. Plus a nightly backup.
 
-**The tactic:** Every always-on service gets **three** launchd jobs, never one: `com.<app>.server` (the process, `KeepAlive: true`), `com.<app>.tunnel` (cloudflared, with its **own** `--config` file — never the shared fallback), and `com.<app>.watchdog` (polls `/api/health`, restarts, escalates to a human rather than restarting forever). Plus a nightly `.backup` job.
-
-**Reference implementation:** `FloodDash/CLAUDE.md`, `AirDash/CLAUDE.md` — `com.flooddash.server` + `.tunnel`; restart via `launchctl kickstart -k gui/$(id -u)/com.flooddash.server`.
-
-**The incident that forced the tunnel rule:** `cloudflared tunnel run <name>` with no `--config` flag silently falls back to `~/.cloudflared/config.yml`. Two tunnels both fell back to it and overwrote each other's ingress routing — two unrelated products went down together, no error anywhere. Fix: make the shared fallback deliberately inert.
+A tunnel binary with no `--config` silently falls back to a shared default. Two tunnels can overwrite each other's ingress with no error. Make the shared fallback deliberately inert:
 
 ```yaml
-# ~/.cloudflared/config.yml — every tunnel has its own file, loaded via
-# an explicit --config flag. Don't add ingress here.
+# Shared fallback only. Every tunnel loads its own file via --config.
 ingress:
   - service: http_status:404
 ```
 
-**Why it matters:** a watchdog that checks the wrong thing is worse than none — it manufactures confidence. One flood collection loop ran dead for 36 days while its archive grew quadratically underneath it, because nothing was checking last-successful-ingest, only "is the process running."
+A watchdog that checks the wrong thing is worse than none — it manufactures confidence. "Process is running" is not "last successful ingest was recent."
 
----
+### 11 Anti-regression ledger
 
-## 11 Anti-Regression Ledger
+**The tactic:** Every project instruction file opens with a numbered, dated **do not touch** list — each item paired with *why*. Agents do not vandalise, they tidy. Anything that looks like an oddity gets cleaned up unless the reason it is deliberate is written down next to it.
 
-**The tactic:** Every project `CLAUDE.md` opens with a numbered, dated **"do not touch"** section — each item paired with *why*. Agents don't vandalise, they tidy; anything that looks like an oddity gets "cleaned up" unless the reason it's deliberate is written down next to it.
-
-**Reference implementation:** `daytraders/CLAUDE.md` §Anti-Regression:
 ```
 1. Zero border-radius — enforced in globals.css. Do not remove the
    `border-radius: 0 !important` reset. It is load-bearing.
-2. Three font sizes only — Display/Body/Micro. Do not introduce a fourth.
-5. Mock data in src/lib/api/mock.ts — the app must render fully with no
-   API keys. Never remove mock fallbacks.
+2. Three font sizes only — Display / Body / Micro. Do not introduce a fourth.
+3. Mock data in src/lib/api/mock.ts — the app must render with no API keys.
 ```
 
-Reverted experiments get the same treatment, dated, so a half-remembered good idea doesn't quietly come back:
+Reverted experiments get the same treatment, dated, so a half-remembered good idea does not quietly return.
+
+### 12 Lesson docs / CPDT trace
+
+**The tactic:** After a hard session, write `docs/lessons/YYYY-MM-DD-the-<something>-pass.md`: what was asked (verbatim), what landed, patterns borrowed (including what was **refused** and why), honest limits, what did not make the cut, the real ship trace, and **one line for the next agent**.
+
+**CPDT** — the ship is not the git push:
+
 ```
-### Hero-Surface Font Exception — TRIALED THEN REVERTED (2026-07-22 → 2026-07-24)
-```
-
-**Why it matters:** this is the single highest-leverage paragraph in any project file. It converts "don't regress the design" from a vibe into something an agent can check before it edits.
-
----
-
-## 12 Lesson Docs / CPDT Trace
-
-**The tactic:** After any session that was hard, write `docs/lessons/YYYY-MM-DD-the-<something>-pass.md`: what was actually asked (verbatim quote), what landed, patterns borrowed from prior art (table: source → pattern → where it landed, including what was explicitly **refused** and why), honest limits stated in the doc itself, what didn't make the cut, the real CPDT trace, and — the whole point — **one line for the next agent**.
-
-**Reference implementation:** `daytraders/docs/lessons/2026-08-11-the-globe-pass.md`. Closing line:
-> "Look across the globe" is a curation discipline, not a feature flag. Eight instruments, read the same way, ranked the same way. Anything more is a screen; a screen is what the user is leaving.
-
-**The CPDT trace, verbatim from a real ship:**
-```
-git pull origin main
-git add -A
-git commit -m "feat(global): look across the globe — global scanner + what-to-watch"
-git push origin main
-npm run build                    # success
-npx wrangler pages deploy        # 682f5208.siam-markets.pages.dev
-curl day.nonarkara.org           # 200 OK with GLOBAL SCANNER present in body
+git pull
+git add -A && git commit && git push
+npm run build                  # must succeed
+deploy to the real host
+curl the public URL            # assert the new surface is in the body
 ```
 
-**Why it matters:** a five-week-dormant project becomes productive in ten minutes when the "why is it like this, and what did we already try" question already has a written answer.
+A dormant project becomes productive when "why is it like this, and what did we already try" already has a written answer.
+
+### 13 Graceful degradation split
+
+**The tactic:** Static frontend on a CDN, talking to a function that proxies `/api/*` with no hard-coded route list, through a named tunnel, to `localhost` on a machine you own. If that machine sleeps, the site still loads — only live data goes stale, and the UI says how stale. Ship `mock.ts` so the app renders with zero keys.
+
+An upstream dying should degrade the app, not blank it. Degradation that is not visible is a lie: a green dot plus "data 12 minutes old," never a silently stale number.
+
+### 14 Shared data catalog
+
+**The tactic:** One catalog across projects: source, cadence → **real latency** (two numbers — "updates every 10 min" and "data is 10–60 min old" are both true; only the second matters to the UI), auth, tier, and a live / port-me status. Before wiring a new adapter, check the catalog and port the known-good implementation.
+
+The catalog grows from real builds, not from a documentation sprint that never happens. A flood dashboard and an air-quality dashboard can share one ingest backbone because the sources were written down somewhere neither project owned.
 
 ---
 
-## 13 Graceful Degradation Split
+## How to contribute
 
-**The tactic:** Static frontend on a CDN (Cloudflare Pages), talking to a Pages Function that proxies **all** of `/api/*` with no hard-coded route list, to a named Cloudflare Tunnel, to `localhost:PORT` on the laptop. If the laptop sleeps, the site still loads — only live data goes stale, and the UI says how stale. Every project also ships `src/lib/api/mock.ts` so it renders fully with zero API keys.
+Append. Do not rewrite the philosophy to taste.
 
-**Reference implementation:** `FloodDash/CLAUDE.md`, `AirDash/CLAUDE.md` — `functions/api/[[path]].js` catches all of `/api/*`; adding a backend endpoint needs no frontend deploy at all.
+A new tactic earns its number when it has already shipped somewhere, not when it sounds wise. PRs should add:
 
-**Why it matters:** an upstream feed dying degrades the app instead of breaking it, and a laptop closing degrades the app instead of taking down a public dashboard. Degradation has to be *visible* to stay honest — a green dot plus "data 12 minutes old," never a silently stale number.
+1. **One line** — the job in a sentence.
+2. **Why it exists** — the incident, constraint, or civic need. No unnamed drama.
+3. **The pattern** — enough to port. Sketches may use placeholders (`env.STATUS`, `/api/health`). Never real tokens, hosts, sheet IDs, or personal endpoints.
+4. **The anti-pattern** — the nearby mistake.
+5. **A public example, if you have one** — a live URL or a public repo. Skip private paths.
 
----
+Open a pull request against `main`. Keep the voice: production, not theory; civic, not vendor pitch. If you are unsure whether a string is a secret, it is — leave it out.
 
-## 14 Shared Data Catalog
-
-**The tactic:** One `_shared/data-catalog/CATALOG.md` across every project: source, cadence → **real latency** (two different numbers — "updates every 10 min" and "data is 10–60 min old" are both true and only the second matters to the UI), auth, tier, and a ✅/📋 status. ✅ rows get a full detail file; 📋 rows point straight at the working implementation in whatever project built it first. Before wiring a new adapter, check the catalog and port the known-good implementation instead of rebuilding it.
-
-**Reference implementation:** `_shared/data-catalog/CATALOG.md` — e.g. `HII ThaiWater — water level | 10 min → 10–60 min | none | live→cache | ✅`.
-
-**Why it matters:** the catalog grows from real builds, not a documentation sprint that never happens — you port a 📋 row to a detail file the next time you actually touch that source. A flood dashboard and an air-quality dashboard now share one ingest backbone because the sources were written down somewhere neither project owned.
+Fixes to prose, ethics, and missing anti-patterns are as welcome as new tactics.
 
 ---
 
-## Shared Resources Quick Reference
+## License
 
-| Resource | Path | What it is |
-|---|---|---|
-| Brand logos | `_shared/brand-assets/` | AXIOM, DEPA, RETL, SLIC, PMUA, Smart City Thailand |
-| Portraits | `_shared/photos/slic/Photos/` | `profile-speaker.jpg`, `profile-group-depa.jpg`, etc. |
-| Knowledge base | `_shared/knowledge-base/` | 100+ PDFs: smart city, SLIC methodology, ASEAN |
-| Geodata | `_shared/geodata/` | GeoJSON boundaries, telemetry schemas |
-| Design tokens | `_shared/design-tokens/dr-non-brand.css` | Canonical CSS variables — the single source of truth |
-| Visitor tracker | `_shared/lib/visitor-tracking.js` | Canonical module — import, don't copy |
-| Tech stack DB | `_toolkit/tech-stack-database/` | All projects, APIs, costs in CSV + Excel |
+This repository is licensed under the [MIT License](LICENSE). Copyright © 2026 Non Arkaraprasertkul.
 
----
+Reuse the ideas, sketches, and prose with attribution. The MIT grant covers **this playbook**. It does not relicense upstream data, municipal identities, or private implementations described as examples.
 
-## What Doesn't Exist Yet (Build Next)
-
-- `GET /query?q=...` semantic search endpoint on the Worker (needs pgvector `match_captures` function already in Supabase)
-- Obsidian daily-note sync from Supabase captures (obsidian-capture-bot is built, just not wired)
-- iOS app using the same Worker endpoints as nonarkara.org (Swift code skeleton in `non-app (council)/ios-reference/`)
-- Apple Watch step count integration (HealthKit → Worker → captures table)
-
----
-
-*This file grows. When you build something new that uses a pattern worth keeping, add it here. Append, don't rewrite.*
-
-This repository is licensed under the MIT License. See [LICENSE](LICENSE).
+If you build something with these patterns, I would like to see it.
